@@ -1,0 +1,15 @@
+{
+  "originHash" : "1a201c15280b0720c5d13f9ff428d00ef93db1bf24ddc062764074b309554fbb",
+  "pins" : [
+    {
+      "identity" : "swiftescposprinter",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/areeb111/SwiftESCPOSPrinter.git",
+      "state" : {
+        "revision" : "e42465159d1c3c4be75a3aa61f36bb7ef57f17b6",
+        "version" : "1.0.0"
+      }
+    }
+  ],
+  "version" : 3
+}
