@@ -63,7 +63,8 @@ printer.connect(host: printerIP, port: printerPort) { success, error in
 
     // Rasterize the receipt to an image (width 576 is standard for 80mm paper)
     if let image = receipt.rasterize(width: 576) {
-        printer.print(image: image) { error in
+        // Print using Raster mode (default, faster) or BitImage mode (ESC *, from Medium article)
+        printer.print(image: image, mode: .raster) { error in
             if let error = error {
                 print("Print failed: \(error)")
             } else {
@@ -77,6 +78,13 @@ printer.connect(host: printerIP, port: printerPort) { success, error in
     }
 }
 ```
+
+### Print Modes
+
+The `print` function supports two modes:
+
+- `.raster` (Default): Uses `GS v 0` command. Faster and recommended for modern printers.
+- `.bitImage`: Uses `ESC *` command. Follows the implementation described in the Medium article. Useful for older printers or specific compatibility needs.
 
 ## Requirements
 

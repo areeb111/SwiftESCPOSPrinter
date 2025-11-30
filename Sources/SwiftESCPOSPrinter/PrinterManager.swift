@@ -10,6 +10,11 @@ import UIKit
 @available(iOS 12.0, macOS 10.14, *)
 public class PrinterManager {
     
+    public enum PrintMode {
+        case raster // GS v 0 (Faster, recommended)
+        case bitImage // ESC * (From Medium article)
+    }
+    
     private var connection: NWConnection?
     private let queue = DispatchQueue(label: "com.swiftescposprinter.queue")
     
@@ -40,7 +45,7 @@ public class PrinterManager {
         connection = nil
     }
     
-    public func print(image: UIImage, width: CGFloat = 576, completion: @escaping (Error?) -> Void) {
+    public func print(image: UIImage, width: CGFloat = 576, mode: PrintMode = .raster, completion: @escaping (Error?) -> Void) {
         // 1. Desaturate
         guard let desaturated = image.desaturated() else {
             completion(NSError(domain: "PrinterManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to desaturate image"]))
@@ -54,13 +59,21 @@ public class PrinterManager {
         }
         
         // 3. Convert to Command
-        guard let command = ImageProcessor.toRasterCommand(image: resized) else {
+        let command: Data?
+        switch mode {
+        case .raster:
+            command = ImageProcessor.toRasterCommand(image: resized)
+        case .bitImage:
+            command = ImageProcessor.toBitImageCommand(image: resized)
+        }
+        
+        guard let finalCommand = command else {
             completion(NSError(domain: "PrinterManager", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to commands"]))
             return
         }
         
         // 4. Send
-        send(data: command, completion: completion)
+        send(data: finalCommand, completion: completion)
     }
     
     public func cutPaper(completion: @escaping (Error?) -> Void) {

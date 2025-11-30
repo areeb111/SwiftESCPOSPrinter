@@ -111,4 +111,84 @@ public class ImageProcessor {
         
         return command
     }
+    
+    /// Converts a UIImage to ESC/POS Bit Image commands (ESC *).
+    /// This follows the logic from the Medium article (24-dot double density).
+    public static func toBitImageCommand(image: UIImage) -> Data? {
+        guard let cgImage = image.cgImage else { return nil }
+        
+        let width = cgImage.width
+        let height = cgImage.height
+        
+        guard let dataProvider = cgImage.dataProvider,
+              let data = dataProvider.data,
+              let ptr = CFDataGetBytePtr(data) else {
+            return nil
+        }
+        
+        var command = Data()
+        
+        // Set line spacing to 0: ESC 3 0
+        command.append(contentsOf: [0x1B, 0x33, 0x00])
+        
+        let bytesPerPixel = cgImage.bitsPerPixel / 8
+        let bytesPerLine = cgImage.bytesPerRow
+        
+        // Helper to get pixel intensity (0=light, 1=dark)
+        func getPixel(x: Int, y: Int) -> UInt8 {
+            if x >= width || y >= height { return 0 }
+            let offset = y * bytesPerLine + x * bytesPerPixel
+            let r = ptr[offset]
+            let g = ptr[offset + 1]
+            let b = ptr[offset + 2]
+            let luminance = 0.299 * Double(r) + 0.587 * Double(g) + 0.114 * Double(b)
+            return luminance < 128 ? 1 : 0
+        }
+        
+        // Iterate through each 24-dot high strip
+        // The article uses height / 24. If height is not divisible, we might lose bottom lines or need padding.
+        // We'll iterate to cover full height.
+        let strips = (height + 23) / 24
+        
+        for j in 0..<strips {
+            // ESC * 33 nL nH
+            // Mode 33 = 24-dot double density
+            command.append(contentsOf: [0x1B, 0x2A, 33])
+            
+            let nL = UInt8(width % 256)
+            let nH = UInt8(width / 256)
+            command.append(contentsOf: [nL, nH])
+            
+            // Iterate columns
+            for i in 0..<width {
+                // Each column has 3 bytes (24 pixels)
+                for m in 0..<3 {
+                    var byte: UInt8 = 0
+                    for n in 0..<8 {
+                        let y = j * 24 + m * 8 + n
+                        let val = getPixel(x: i, y: y)
+                        // Article logic: byte = (byte << 1) | b
+                        // This packs MSB first (top pixel is MSB?)
+                        // Let's check article: "byte = (byte << 1) | b" inside loop n=0..8
+                        // If n=0 (top), it gets shifted 7 times? No.
+                        // n=0: byte = b
+                        // n=1: byte = b0<<1 | b1
+                        // ...
+                        // n=7: byte = b0<<7 ... | b7
+                        // So top pixel is MSB. Correct for ESC *.
+                        byte = (byte << 1) | val
+                    }
+                    command.append(byte)
+                }
+            }
+            
+            // Line Feed
+            command.append(0x0A)
+        }
+        
+        // Restore line spacing (optional, usually 30 or 32)
+        command.append(contentsOf: [0x1B, 0x32])
+        
+        return command
+    }
 }
